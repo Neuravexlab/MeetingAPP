@@ -114,7 +114,7 @@ textarea{min-height:120px;line-height:1.7;}
     <div class="hero-icon">🤖</div>
     <div class="hero-title">会議をAIで楽にしましょう</div>
     <div class="hero-desc">議長の準備も、議事録作成も、AIがサポートします。</div>
-    <div style="margin-top:12px;background:rgba(255,255,255,0.15);border-radius:6px;padding:7px 14px;font-size:12px;">🎬 デモモード — パスワード入力なしでご覧いただけます</div>
+    
   </div>
   <div id="noSetupMsg" class="card" style="display:none;text-align:center;">
     <div style="font-size:32px;margin-bottom:10px;">⚙️</div>
@@ -341,14 +341,6 @@ const TAB_LABELS = {
 };
 
 window.onload = function() {
-  const DEMO_PW = "demo1234";
-  const DEMO_KEY = "DEMO_KEY_NOT_REAL";
-  if (!localStorage.getItem("smt_pw")) {
-    localStorage.setItem("smt_key", obf(DEMO_KEY));
-    localStorage.setItem("smt_pw", hashPw(DEMO_PW));
-  }
-  isLoggedIn = true;
-  currentApiKey = deobf(localStorage.getItem("smt_key") || "");
   refreshHome();
   refreshSettings();
 };
@@ -561,21 +553,6 @@ function clearFile() {
 async function callGemini(textPrompt, fileData) {
   if (!currentApiKey) throw new Error("APIキーが設定されていません");
 
-  // デモモード：偽のキーなら模擬応答を返す
-  if (currentApiKey === "DEMO_KEY_NOT_REAL") {
-    await new Promise(function(r) { setTimeout(r, 1500); });
-    if (textPrompt.indexOf("議事録") !== -1) {
-      return "【議事録】\n\n■ 議題1：運動会の役割分担\n・体育主任から昨年の役割表をもとに説明\n・新任の田中先生に競技係を割り当てる方針で合意\n・決定事項：6/30までに各学年の役割案を提出\n\n■ 議題2：保護者懇談\n・7月第2週で各学年実施\n・決定事項：日程調整票を6/25配布\n\n【1分サマリー】\n・運動会の役割：6/30までに学年案を提出\n・保護者懇談：7月第2週実施、6/25に日程調整票配布\n・次回会議：6/27（金）15:00\n\n【アクションプラン】\nACTION: 各学年の運動会役割案を作成 / WHO: 各学年主任 / WHEN: 6/30 / PRIORITY: 高\nACTION: 保護者懇談の日程調整票を作成・配布 / WHO: 教務主任 / WHEN: 6/25 / PRIORITY: 高\nACTION: 体育館使用スケジュール調整 / WHO: 体育主任 / WHEN: 7/5 / PRIORITY: 中";
-    }
-    let demoResult = "## ① 議題の改善提案\n\n1. 運動会の役割分担について決定する\n   ・目的：意思決定\n   ・事前準備：昨年度の役割表、今年の教職員名簿\n\n2. 来月の保護者懇談の進め方を共有する\n   ・目的：情報共有\n   ・事前準備：各学年の希望日程\n\n3. 生徒指導の現状と今後の方針を協議する\n   ・目的：意見収集\n   ・事前準備：直近1か月の指導案件まとめ\n\n## ② タイムスケジュール（60分）\n\n| 時刻 | 内容 | 時間 | 担当 |\n|------|------|------|------|\n| 15:00 | 開会・本日の議題確認 | 5分 | 議長 |\n| 15:05 | 運動会の役割分担 | 20分 | 体育主任 |\n| 15:25 | 保護者懇談の進め方 | 15分 | 教務主任 |\n| 15:40 | 生徒指導の協議 | 15分 | 生徒指導主任 |\n| 15:55 | 連絡事項・閉会 | 5分 | 議長 |\n\n## ③ 議長へのポイント\n\n1. 各議題の開始時に「この議題で何を決めるか」を明確に共有する\n2. 議論が脱線したら穏やかに軌道修正を行う\n3. 残り時間を意識し、5分前に「あと5分です」と声かけ";
-
-    if (fileData) {
-      demoResult += "\n\n## ④ 司会進行台本\n\n【開会】\n「本日はお忙しい中お集まりいただきありがとうございます。ただ今から第3回学年主任会議を始めます。本日は3つの議題について協議します。」\n\n【議題1の導入】\n「では最初の議題、運動会の役割分担に移ります。体育主任からご説明をお願いします。」\n\n【まとめ】\n「ありがとうございました。本日決まったことを確認します。運動会の役割案は6/30までに各学年からご提出ください。」\n\n【閉会】\n「以上で本日の会議を終わります。次回は6/27（金）15時からです。本日はありがとうございました。」";
-    }
-    return "🎬 [デモモード：実際のGemini APIは呼ばれていません]\n\n" + demoResult;
-  }
-
-  // 本番モード
   let parts = [];
   if (fileData) {
     if (fileData.isBinary) {
