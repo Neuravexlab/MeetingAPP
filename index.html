@@ -214,7 +214,7 @@ textarea{min-height:120px;line-height:1.7;}
 
   <div class="card">
     <div class="card-title">📌 議題メモ（箇条書きでOK）</div>
-    <p style="font-size:12px;color:var(--muted);margin-bottom:12px;">思いつくままざっくりと。AIが整理・改善します。</p>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:12px;">思いつくままざっくりと。AIが整理・改善します。<br><strong style="color:var(--blue);">※ 上で資料をアップロードした場合は、議題入力なしでもOK</strong></p>
     <div id="agendaRows">
       <div class="agenda-row"><div class="anum">1</div><input type="text" placeholder="例：運動会の役割分担"><button class="del-btn" onclick="delRow(this)">x</button></div>
       <div class="agenda-row"><div class="anum">2</div><input type="text" placeholder="例：来月の保護者懇談"><button class="del-btn" onclick="delRow(this)">x</button></div>
@@ -587,7 +587,7 @@ async function callGemini(textPrompt, fileData) {
   parts.push({ text: textPrompt });
   const body = { contents: [{ parts: parts }] };
   const res = await fetch(
-    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + currentApiKey,
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + currentApiKey,
     { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }
   );
   const d = await res.json();
@@ -599,7 +599,10 @@ async function callGemini(textPrompt, fileData) {
 
 async function runChair() {
   const items = [...document.querySelectorAll("#agendaRows input")].map(function(i) { return i.value; }).filter(function(v) { return v.trim(); });
-  if (!items.length) { alert("議題を1つ以上入力してください"); return; }
+  if (!items.length && !resumeFileData) {
+    alert("議題を1つ以上入力するか、会議資料をアップロードしてください");
+    return;
+  }
   document.getElementById("chairLoad").classList.add("show");
   document.getElementById("chairResult").classList.remove("show");
 
@@ -609,21 +612,65 @@ async function runChair() {
   const members = document.getElementById("c_members").value || "";
   const goal = document.getElementById("c_goal").value || "";
 
-  let prompt = "学校運営の会議進行の専門家として、日本語で丁寧に回答してください。\n\n";
+  let prompt = "あなたは学校運営の会議進行のプロフェッショナルです。\n";
+  prompt += "「会議終了と同時にすべて決まっている状態」を作り出すための進行設計を行ってください。\n\n";
   prompt += "【会議情報】\n";
   prompt += "会議名：" + name + "\n日時：" + date + "\n持ち時間：" + duration + "分\n参加者：" + members + "\n目的：" + goal + "\n\n";
-  prompt += "【議長の議題メモ】\n";
-  prompt += items.map(function(t, i) { return (i + 1) + ". " + t; }).join("\n") + "\n\n";
+
+  if (items.length > 0) {
+    prompt += "【議長の議題メモ】\n";
+    prompt += items.map(function(t, i) { return (i + 1) + ". " + t; }).join("\n") + "\n\n";
+  } else if (resumeFileData) {
+    prompt += "【議題メモ】\n（議長からの入力なし → 添付の会議資料から議題を読み取って自動抽出してください）\n\n";
+  }
+
+  prompt += "===========================================\n";
+  prompt += "■ 進行設計の5つの鉄則\n";
+  prompt += "===========================================\n";
+  prompt += "1. 最初にゴールを握る（今日何が終わったら終わりか）\n";
+  prompt += "2. 確認メモを事前に画面表示（聞きたいことを箇条書きで先に出す）\n";
+  prompt += "3. リアルタイム記録（会議中に画面共有しながら決定事項を書き込む）\n";
+  prompt += "4. ネクストアクションをその場で合意（誰が・何を・いつまでに）\n";
+  prompt += "5. 最後にゴール達成を確認（冒頭のゴールを再表示）\n\n";
+
   prompt += "以下をすべて作成してください：\n\n";
-  prompt += "## ① 議題の改善提案\n各議題について、改善後の議題名・目的・事前準備を記載\n\n";
-  prompt += "## ② タイムスケジュール（" + duration + "分）\n表形式で：時刻 / 内容 / 時間 / 担当\n\n";
-  prompt += "## ③ 議長へのポイント（3点以内）\nスムーズに進めるためのアドバイス\n\n";
+
+  if (items.length === 0 && resumeFileData) {
+    prompt += "## ⓪ 資料から抽出した議題一覧\n";
+    prompt += "添付資料の内容を読み取り、会議で取り上げるべき議題を箇条書きで列挙してください。\n\n";
+  }
+
+  prompt += "## ① 本日のゴール\n";
+  prompt += "この会議が終わった時「これとこれが決まっていれば成功」という明確な達成条件を1〜2項目で書いてください。\n";
+  prompt += "例：✅ 運動会の役割分担が全員合意で確定している\n\n";
+
+  prompt += "## ② 議題の改善提案\n";
+  prompt += "各議題について以下を記載：\n";
+  prompt += "・改善後の議題名（「〇〇について決定する」など、ゴールが明確な形に）\n";
+  prompt += "・目的（情報共有／意思決定／意見収集）\n";
+  prompt += "・事前準備（議長が用意しておくもの）\n";
+  prompt += "・確認メモ（その場で全員に画面表示する質問項目）\n\n";
+
+  prompt += "## ③ タイムスケジュール（" + duration + "分）\n";
+  prompt += "表形式（| 時刻 | 内容 | 時間 | 担当 | この時間で決めること |）で記載。\n";
+  prompt += "各時間枠で「何を決めるか」を必ず明記してください。\n";
+  prompt += "開会（ゴール共有）・各議題・ネクストアクション確認・閉会を含めること。\n\n";
+
+  prompt += "## ④ 議長へのポイント（3点）\n";
+  prompt += "会議中に決定事項を確定させるための具体的アドバイス：\n";
+  prompt += "・心理的ハードルを下げる進め方\n";
+  prompt += "・参加者の発言を言語化するコツ\n";
+  prompt += "・時間内に終わらせるテクニック\n\n";
 
   if (resumeFileData) {
-    prompt += "## ④ 司会進行台本\n";
-    prompt += "添付の会議資料を読み取り、議長が当日そのまま読み上げられる台本を作成してください。\n";
-    prompt += "形式：開会あいさつ → 各議題の導入セリフ → まとめセリフ → 閉会あいさつ\n";
-    prompt += "自然な口語体（「では～」「続いて～」など）で書いてください。";
+    prompt += "## ⑤ 司会進行台本\n";
+    prompt += "添付の会議資料を読み取り、議長が当日そのまま読み上げられる台本を作成してください。\n\n";
+    prompt += "【開会】本日のゴール共有を含む\n";
+    prompt += "【各議題への導入】この時間で何を決めるかを明示\n";
+    prompt += "【リアルタイム合意のセリフ】「画面に書いた内容で間違いないですか？」など\n";
+    prompt += "【ネクストアクション確認】「△△さんが□□を◯月◯日まで、これでよろしいですね？」\n";
+    prompt += "【閉会】冒頭のゴールに戻って達成を確認\n\n";
+    prompt += "自然な口語体で、議長がそのまま読み上げられる形で書いてください。";
   }
 
   try {
@@ -654,13 +701,34 @@ async function runSec() {
   const name = document.getElementById("s_name").value || "会議";
   const date = document.getElementById("s_date").value || "";
   const members = document.getElementById("s_members").value || "";
-  const prompt = "学校会議の議事録作成の専門家として、正確で行動につながる議事録を日本語で作成してください。\n\n"
-    + "【会議情報】会議名：" + name + "　日時：" + date + "　参加者：" + members + "\n"
-    + "【文字起こし】\n" + transcript + "\n\n"
-    + "以下の3つをすべて作成してください。\n\n"
-    + "## 【議事録】\n議題ごとに：報告の要点・主な意見・決定事項（必ず明記）。話し言葉を書き言葉に。\n\n"
-    + "## 【1分サマリー】\n今日決まったこと（3点以内）・全員が知るべきこと・次のステップ\n\n"
-    + "## 【アクションプラン】\nACTION: やること / WHO: 担当 / WHEN: 期限 / PRIORITY: 高中低　の形式で列挙";
+  let prompt = "あなたは学校会議の議事録作成のプロフェッショナルです。\n";
+  prompt += "プロが実践する以下の3大原則に従って議事録を作成してください。\n\n";
+  prompt += "【3大原則】\n";
+  prompt += "1. 結論ファースト（タイトル→結論→背景の順で書く）\n";
+  prompt += "2. 感情と事実を両方残す（決定事項だけでなく懸念・期待も記録）\n";
+  prompt += "3. タイトル必須（各議題に明確なタイトルをつける）\n\n";
+  prompt += "【会議情報】会議名：" + name + "　日時：" + date + "　参加者：" + members + "\n";
+  prompt += "【文字起こし】\n" + transcript + "\n\n";
+  prompt += "以下の3つをすべて作成してください。\n\n";
+  prompt += "## 【議事録】\n";
+  prompt += "各議題ごとに以下の構造で：\n";
+  prompt += "### 📌 議題X：（明確なタイトル）\n";
+  prompt += "【結論】最初に決定事項を1〜2行で。5W1H明確に。\n";
+  prompt += "【背景・経緯】課題・議論（賛否両方）・なぜその結論に至ったか\n";
+  prompt += "【詳細】報告の要点・主な発言・配慮事項\n\n";
+  prompt += "【決定事項の抽出ルール】\n";
+  prompt += "・「〜することにします」「異議なしですね」「では〜でいきましょう」は必ず拾う\n";
+  prompt += "・「よろしいですね」と問いかけて否定意見がなかった事項も決定事項\n";
+  prompt += "・5W1Hで書く（×「役割表を作る」 ○「田中先生が6/30までに役割表案を作成」）\n";
+  prompt += "・曖昧な事項は【要確認】として別枠で記載\n";
+  prompt += "・話し言葉を書き言葉に直し、フィラー（えーと等）は削除\n\n";
+  prompt += "## 【1分サマリー】\n";
+  prompt += "・🎯 今日決まったこと（3点以内）\n";
+  prompt += "・⚠️ 全員が知っておくべき重要事項\n";
+  prompt += "・📅 次のステップ・次回会議\n\n";
+  prompt += "## 【アクションプラン】\n";
+  prompt += "ACTION: 具体的なやること（5W1H明確）\nWHO: 担当者\nWHEN: 期限（未定なら「未定（要確認）」）\nPRIORITY: 高/中/低\n";
+  prompt += "【優先度基準】高=1週間以内 / 中=1か月以内 / 低=長期的検討";
   try {
     const result = await callGemini(prompt, null);
     const min = extr(result, "【議事録】", "【1分サマリー】");
@@ -700,7 +768,7 @@ async function runDebug() {
   out.textContent = log;
 
   try {
-    const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + savedKey;
+    const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + savedKey;
     const body = { contents: [{ parts: [{ text: "Hello, reply with just 'OK'" }] }] };
     const res = await fetch(url, {
       method: "POST",
