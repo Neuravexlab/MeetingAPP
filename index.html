@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>学校会議 AI支援ツール</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap');
+:root{--navy:#1c3557;--blue:#2563eb;--teal:#0d9488;--green:#16a34a;--amber:#d97706;--red:#dc2626;--bg:#f1f5f9;--white:#fff;--ink:#1e293b;--muted:#64748b;--border:#e2e8f0;--radius:10px;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--ink);font-size:15px;line-height:1.7;min-height:100vh;padding-bottom:80px;}
+.screen{display:none;}.screen.active{display:block;}
+.topbar{background:var(--navy);color:white;padding:14px 20px;position:sticky;top:0;z-index:100;}
+.topbar-title{font-size:16px;font-weight:700;}
+.topbar-sub{font-size:11px;opacity:0.65;margin-top:1px;}
+.bnav{position:fixed;bottom:0;left:0;right:0;background:var(--navy);display:flex;z-index:200;box-shadow:0 -2px 10px rgba(0,0,0,0.2);}
+.bnav-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:10px 4px 8px;border:none;background:transparent;color:rgba(255,255,255,0.5);font-family:inherit;font-size:10px;font-weight:700;cursor:pointer;gap:3px;letter-spacing:0.04em;transition:color 0.15s;}
+.bnav-btn .icon{font-size:22px;line-height:1;}
+.bnav-btn.active{color:#fff;}
+.wrap{max-width:600px;margin:0 auto;padding:20px 16px 20px;}
+.hero{background:var(--navy);color:white;border-radius:var(--radius);padding:28px 24px;margin-bottom:20px;text-align:center;}
+.hero-icon{font-size:48px;margin-bottom:10px;}
+.hero-title{font-size:21px;font-weight:700;margin-bottom:6px;}
+.hero-desc{font-size:13px;opacity:0.8;line-height:1.6;}
+.card{background:white;border-radius:var(--radius);border:1px solid var(--border);padding:20px;margin-bottom:14px;}
+.card-title{font-size:14px;font-weight:700;color:var(--navy);margin-bottom:14px;display:flex;align-items:center;gap:8px;}
+.lock-box{background:white;border-radius:var(--radius);border:1px solid var(--border);padding:32px 24px;text-align:center;margin-bottom:16px;}
+.lock-icon{font-size:48px;margin-bottom:12px;}
+.lock-title{font-size:18px;font-weight:700;color:var(--navy);margin-bottom:6px;}
+.lock-desc{font-size:13px;color:var(--muted);margin-bottom:20px;line-height:1.6;}
+.field-label{font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.08em;margin-bottom:6px;margin-top:12px;}
+.field-label:first-child{margin-top:0;}
+input[type="text"],input[type="password"],input[type="number"],textarea{width:100%;border:1px solid var(--border);border-radius:8px;padding:11px 14px;font-family:inherit;font-size:15px;color:var(--ink);background:var(--bg);transition:border-color 0.15s;resize:vertical;-webkit-appearance:none;}
+input:focus,textarea:focus{outline:none;border-color:var(--blue);background:white;}
+textarea{min-height:120px;line-height:1.7;}
+.pw-wrap{position:relative;}
+.pw-wrap input{padding-right:46px;}
+.pw-eye{position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:18px;color:var(--muted);padding:4px;}
+.status-ok{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--green);background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:6px 12px;margin-top:8px;}
+.status-ng{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--red);background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:6px 12px;margin-top:8px;}
+.btn{width:100%;background:var(--blue);color:white;border:none;border-radius:10px;padding:14px;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;transition:background 0.15s;margin-top:8px;display:block;}
+.btn:hover{background:#1d4ed8;}
+.btn:active{transform:scale(0.98);}
+.btn:disabled{background:var(--border);color:var(--muted);cursor:not-allowed;transform:none;}
+.btn.teal{background:var(--teal);}.btn.teal:hover{background:#0a7a71;}
+.btn.danger{background:#b91c1c;}.btn.danger:hover{background:#991b1b;}
+.btn.sm{padding:9px 16px;font-size:13px;width:auto;border-radius:7px;display:inline-block;margin-top:0;}
+.btn.outline{background:transparent;border:1px dashed var(--border);color:var(--muted);}.btn.outline:hover{border-color:var(--blue);color:var(--blue);background:#eff6ff;}
+.agenda-row{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+.agenda-row input{flex:1;}
+.anum{width:28px;height:28px;background:var(--blue);color:white;border-radius:50%;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.del-btn{background:none;border:none;color:var(--border);font-size:20px;cursor:pointer;padding:4px;line-height:1;flex-shrink:0;}
+.del-btn:hover{color:var(--red);}
+.loading{display:none;text-align:center;padding:28px;background:white;border-radius:var(--radius);border:1px solid var(--border);margin-top:14px;}
+.loading.show{display:block;}
+.spinner{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 12px;}
+.spinner.teal{border-top-color:var(--teal);}
+@keyframes spin{to{transform:rotate(360deg);}}
+.loading-text{font-size:13px;color:var(--muted);}
+.result-card{display:none;background:white;border-radius:var(--radius);border:1px solid var(--border);overflow:hidden;margin-top:14px;}
+.result-card.show{display:block;}
+.result-head{background:var(--navy);color:white;padding:12px 16px;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:space-between;}
+.result-head.teal{background:var(--teal);}
+.result-head.green{background:var(--green);}
+.result-head.amber{background:#b45309;}
+.copy-btn{background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.3);color:white;font-family:inherit;font-size:12px;font-weight:700;padding:4px 12px;border-radius:5px;cursor:pointer;}
+.copy-btn:hover{background:rgba(255,255,255,0.3);}
+.result-body{padding:18px;font-size:13px;line-height:1.9;white-space:pre-wrap;max-height:500px;overflow-y:auto;}
+.info-box{background:#fefce8;border:1px solid #fde68a;border-radius:8px;padding:14px 16px;font-size:12px;color:#78350f;line-height:1.7;margin-bottom:14px;}
+.char-count{font-size:12px;color:var(--muted);text-align:right;margin-top:4px;}
+.guide-toggle{width:100%;background:white;border:1px solid var(--border);border-radius:var(--radius);padding:14px 20px;font-family:inherit;font-size:13px;font-weight:700;color:var(--muted);cursor:pointer;display:flex;align-items:center;gap:8px;margin-top:4px;}
+.guide-toggle:hover{color:var(--ink);}
+.guide-box{display:none;background:white;border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-top:8px;font-size:13px;line-height:1.9;}
+.guide-box.open{display:block;}
+.guide-sec-title{font-weight:700;color:var(--navy);margin-bottom:8px;font-size:14px;margin-top:16px;}
+.guide-sec-title:first-child{margin-top:0;}
+.guide-step{display:flex;gap:10px;margin-bottom:6px;align-items:flex-start;}
+.gnum{width:22px;height:22px;background:var(--blue);color:white;border-radius:50%;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px;}
+.gnum.teal{background:var(--teal);}
+.tip-box{background:#f0fdfa;border-left:3px solid var(--teal);padding:10px 14px;border-radius:0 6px 6px 0;font-size:12px;color:#134e4a;margin-top:10px;}
+.scard{background:white;border-radius:var(--radius);border:1px solid var(--border);overflow:hidden;margin-bottom:16px;}
+.scard-head{background:var(--navy);color:white;padding:12px 18px;font-size:13px;font-weight:700;}
+.scard-head.danger{background:#7f1d1d;}
+.scard-body{padding:18px;}
+.divider{border:none;border-top:1px solid var(--border);margin:16px 0;}
+.err-msg{display:none;font-size:12px;color:var(--red);margin-top:6px;}
+.mode-cards{display:flex;flex-direction:column;gap:12px;}
+.mode-card{background:white;border-radius:var(--radius);border:2px solid var(--border);padding:18px;cursor:pointer;transition:all 0.15s;display:flex;align-items:center;gap:14px;}
+.mode-card:hover{border-color:var(--blue);box-shadow:0 2px 12px rgba(37,99,235,0.1);}
+.mode-card:active{transform:scale(0.98);}
+.mode-icon{font-size:30px;flex-shrink:0;width:52px;height:52px;background:var(--bg);border-radius:10px;display:flex;align-items:center;justify-content:center;}
+.mode-title{font-size:15px;font-weight:700;margin-bottom:2px;}
+.mode-who{font-size:10px;font-weight:700;color:var(--blue);letter-spacing:0.05em;margin-bottom:3px;}
+.mode-desc{font-size:12px;color:var(--muted);line-height:1.4;}
+.mode-arrow{margin-left:auto;font-size:20px;color:var(--muted);flex-shrink:0;}
+.upload-zone{border:2px dashed var(--border);border-radius:10px;padding:28px 20px;text-align:center;cursor:pointer;transition:all 0.2s;background:var(--bg);}
+.upload-zone:hover{border-color:var(--blue);background:#eff6ff;}
+.upload-icon-wrap{font-size:36px;margin-bottom:8px;}
+.upload-zone-title{font-size:14px;font-weight:700;color:var(--navy);margin-bottom:4px;}
+.upload-zone-sub{font-size:12px;color:var(--muted);}
+@media(max-width:480px){.hero-title{font-size:18px;}.btn{font-size:14px;padding:13px;}}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="topbar-title">🏫 学校会議 AI支援ツール</div>
+  <div class="topbar-sub" id="topbarSub">会議をAIで楽にしましょう</div>
+</div>
+
+<!-- HOME -->
+<div class="screen active" id="screenHome">
+<div class="wrap">
+  <div class="hero">
+    <div class="hero-icon">🤖</div>
+    <div class="hero-title">会議をAIで楽にしましょう</div>
+    <div class="hero-desc">議長の準備も、議事録作成も、AIがサポートします。</div>
+    <div style="margin-top:12px;background:rgba(255,255,255,0.15);border-radius:6px;padding:7px 14px;font-size:12px;">🎬 デモモード — パスワード入力なしでご覧いただけます</div>
+  </div>
+  <div id="noSetupMsg" class="card" style="display:none;text-align:center;">
+    <div style="font-size:32px;margin-bottom:10px;">⚙️</div>
+    <div style="font-weight:700;color:var(--navy);margin-bottom:6px;">初回設定が必要です</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:16px;">管理者が「設定」タブでAPIキーとパスワードを登録してください。</div>
+    <button class="btn sm" onclick="switchTab('settings')">⚙️ 設定へ</button>
+  </div>
+  <div id="lockBox" class="lock-box" style="display:none;">
+    <div class="lock-icon">🔒</div>
+    <div class="lock-title">パスワードを入力</div>
+    <div class="lock-desc">管理者から受け取ったパスワードを入力してください。</div>
+    <div class="pw-wrap">
+      <input type="password" id="loginPw" placeholder="パスワード" onkeydown="if(event.key==='Enter')doLogin()">
+      <button class="pw-eye" onclick="togglePw('loginPw',this)">👁</button>
+    </div>
+    <div class="err-msg" id="loginErr">パスワードが違います</div>
+    <button class="btn" onclick="doLogin()">🔓 ログイン</button>
+  </div>
+  <div id="modeSelect" style="display:none;">
+    <div style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:0.1em;margin-bottom:12px;">📋 モードを選ぶ</div>
+    <div class="mode-cards">
+      <div class="mode-card" onclick="switchTab('chair')">
+        <div class="mode-icon">🎯</div>
+        <div>
+          <div class="mode-who">議長・主任向け</div>
+          <div class="mode-title">議題の準備</div>
+          <div class="mode-desc">議題メモ → AIが改善・タイムスケジュール提案</div>
+        </div>
+        <div class="mode-arrow">›</div>
+      </div>
+      <div class="mode-card" onclick="switchTab('sec')">
+        <div class="mode-icon">📝</div>
+        <div>
+          <div class="mode-who">議事録係向け</div>
+          <div class="mode-title">議事録・要約の作成</div>
+          <div class="mode-desc">文字起こし貼り付け → 議事録・サマリー・アクションプラン生成</div>
+        </div>
+        <div class="mode-arrow">›</div>
+      </div>
+    </div>
+    <div style="text-align:right;margin-top:10px;">
+      <button onclick="doLogout()" style="background:none;border:none;font-size:12px;color:var(--muted);cursor:pointer;font-family:inherit;">🔒 ログアウト</button>
+    </div>
+  </div>
+  <button class="guide-toggle" onclick="toggleGuide()">
+    <span>📖</span> 使い方ガイドを見る <span style="margin-left:auto" id="guideArrow">▼</span>
+  </button>
+  <div class="guide-box" id="guideBox">
+    <div class="guide-sec-title">🎯 議長モードの使い方</div>
+    <div class="guide-step"><div class="gnum">1</div><div>会議の基本情報と持ち時間を入力</div></div>
+    <div class="guide-step"><div class="gnum">2</div><div>議題をメモ書き程度でOK・箇条書きで入力</div></div>
+    <div class="guide-step"><div class="gnum">3</div><div>ボタンを押す → AIが議題改善＋スケジュール提案</div></div>
+    <div class="guide-sec-title">📝 議事録係モードの使い方</div>
+    <div class="guide-step"><div class="gnum teal">1</div><div>会議をスマホのボイスメモで録音</div></div>
+    <div class="guide-step"><div class="gnum teal">2</div><div><strong>Notta</strong> や <strong>Googleドキュメント（音声入力）</strong> で文字起こし</div></div>
+    <div class="guide-step"><div class="gnum teal">3</div><div>テキストを貼り付けてボタンを押す → 3点セット自動生成</div></div>
+    <div class="tip-box">💡 文字起こしは多少のノイズや誤字があっても大丈夫。AIが整理します。</div>
+  </div>
+</div>
+</div>
+
+<!-- CHAIR -->
+<div class="screen" id="screenChair">
+<div class="wrap">
+  <div class="card">
+    <div class="card-title">📋 会議の基本情報</div>
+    <div class="field-label">会議名</div>
+    <input type="text" id="c_name" placeholder="例：第3回 学年主任会議">
+    <div class="field-label">日時</div>
+    <input type="text" id="c_date" placeholder="例：6月20日（金）15:00〜16:00">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;">
+      <div><div class="field-label">会議時間（分）</div><input type="number" id="c_duration" value="60" min="15" max="180"></div>
+      <div><div class="field-label">参加者</div><input type="text" id="c_members" placeholder="例：主任6名・教頭"></div>
+    </div>
+    <div class="field-label">この会議で決めたいこと（任意）</div>
+    <input type="text" id="c_goal" placeholder="例：運動会の役割を全員が合意する">
+  </div>
+  <!-- ===== RESUME UPLOAD ===== -->
+  <div class="card" id="resumeCard">
+    <div class="card-title">📂 資料アップロード（任意）
+      <span style="font-size:10px;font-weight:700;background:#e0f2fe;color:#0369a1;padding:2px 8px;border-radius:20px;">PDF / Word / TXT</span>
+    </div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:14px;">会議資料・レジュメをアップロードすると、AIが内容を読み取って<strong>司会進行台本</strong>を作成します。</p>
+    <label class="upload-zone" id="uploadZone" for="resumeFile" style="display:block;cursor:pointer;">
+      <div class="upload-icon-wrap">📄</div>
+      <div class="upload-zone-title">ここをタップしてファイルを選ぶ</div>
+      <div class="upload-zone-sub">PDF・Word(.docx)・テキスト(.txt) に対応</div>
+    </label>
+    <input type="file" id="resumeFile" accept=".pdf,.docx,.doc,.txt,.md" style="display:none" onchange="handleFile(this)">
+    <div id="fileStatus" style="display:none;margin-top:10px;padding:10px 14px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;font-size:13px;font-weight:700;color:#166534;display:none;align-items:center;gap:8px;">
+      <span>✅</span><span id="fileStatusText"></span>
+      <button onclick="clearFile()" style="margin-left:auto;background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;line-height:1;">×</button>
+    </div>
+    <div id="readingStatus" style="display:none;font-size:12px;color:var(--muted);margin-top:8px;padding:8px 12px;background:var(--bg);border-radius:6px;">⏳ ファイルを読み取り中…</div>
+    <textarea id="resumeText" style="display:none;min-height:80px;margin-top:10px;font-size:12px;" placeholder="読み取った内容（自動入力）" readonly></textarea>
+  </div>
+
+  <div class="card">
+    <div class="card-title">📌 議題メモ（箇条書きでOK）</div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:12px;">思いつくままざっくりと。AIが整理・改善します。</p>
+    <div id="agendaRows">
+      <div class="agenda-row"><div class="anum">1</div><input type="text" placeholder="例：運動会の役割分担"><button class="del-btn" onclick="delRow(this)">x</button></div>
+      <div class="agenda-row"><div class="anum">2</div><input type="text" placeholder="例：来月の保護者懇談"><button class="del-btn" onclick="delRow(this)">x</button></div>
+      <div class="agenda-row"><div class="anum">3</div><input type="text" placeholder="例：生徒指導の件"><button class="del-btn" onclick="delRow(this)">x</button></div>
+    </div>
+    <button class="btn outline" onclick="addRow()" style="margin-top:8px;">+ 議題を追加</button>
+  </div>
+  <button class="btn" onclick="runChair()">✨ 議題を改善してスケジュールを作る</button>
+  <div class="loading" id="chairLoad"><div class="spinner"></div><div class="loading-text">AIが議題を整理してスケジュールを作っています…</div></div>
+  <div class="result-card" id="chairResult">
+    <div class="result-head">✨ AI改善提案<button class="copy-btn" onclick="copyText('chairBody')">コピー</button></div>
+    <div class="result-body" id="chairBody"></div>
+  </div>
+</div>
+</div>
+
+<!-- SEC -->
+<div class="screen" id="screenSec">
+<div class="wrap">
+  <div class="card">
+    <div class="card-title">📋 会議情報（任意）</div>
+    <div class="field-label">会議名</div><input type="text" id="s_name" placeholder="例：職員会議">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;">
+      <div><div class="field-label">開催日</div><input type="text" id="s_date" placeholder="例：6月20日"></div>
+      <div><div class="field-label">参加者</div><input type="text" id="s_members" placeholder="例：校長・教頭・主任"></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">📄 文字起こしを貼り付け</div>
+    <div class="info-box">💡 <strong>手順：</strong>① スマホで録音 → ② Notta や Googleドキュメントで文字起こし → ③ テキストをここに貼り付け</div>
+    <textarea id="s_transcript" placeholder="ここに文字起こしを貼り付けてください。" oninput="updateCharCount()"></textarea>
+    <div class="char-count" id="charCount">0文字</div>
+  </div>
+  <button class="btn teal" onclick="runSec()" id="secBtn" disabled>📝 議事録・要約・アクションプランを作る</button>
+  <div class="loading" id="secLoad"><div class="spinner teal"></div><div class="loading-text">AIが文字起こしを整理して議事録を作成中…（30秒ほどかかる場合があります）</div></div>
+  <div class="result-card" id="r_minutes"><div class="result-head teal">📋 議事録<button class="copy-btn" onclick="copyText('b_minutes')">コピー</button></div><div class="result-body" id="b_minutes"></div></div>
+  <div class="result-card" id="r_summary"><div class="result-head green">⚡ 1分サマリー<button class="copy-btn" onclick="copyText('b_summary')">コピー</button></div><div class="result-body" id="b_summary"></div></div>
+  <div class="result-card" id="r_action"><div class="result-head amber">✅ アクションプラン<button class="copy-btn" onclick="copyText('b_action')">コピー</button></div><div class="result-body" id="b_action"></div></div>
+</div>
+</div>
+
+<!-- SETTINGS -->
+<div class="screen" id="screenSettings">
+<div class="wrap">
+
+  <div class="scard">
+    <div class="scard-head">🔑 APIキー＆パスワード設定（管理者用）</div>
+    <div class="scard-body">
+      <div id="apiStatus"></div>
+      <hr class="divider">
+      <!-- 設定済みの場合：管理者認証 -->
+      <div id="adminAuthArea" style="display:none;">
+        <p style="font-size:13px;color:var(--muted);margin-bottom:12px;">設定を変更するには管理者パスワードを入力してください。</p>
+        <div class="pw-wrap">
+          <input type="password" id="adminAuthPw" placeholder="管理者パスワード" onkeydown="if(event.key==='Enter')unlockSettings()">
+          <button class="pw-eye" onclick="togglePw('adminAuthPw',this)">👁</button>
+        </div>
+        <div class="err-msg" id="adminAuthErr">パスワードが違います</div>
+        <button class="btn sm" style="margin-top:10px;" onclick="unlockSettings()">🔓 設定を変更する</button>
+      </div>
+      <!-- 設定フォーム -->
+      <div id="settingsForm" style="display:none;">
+        <div class="field-label">Gemini APIキー</div>
+        <div class="pw-wrap">
+          <input type="password" id="apiKeyInput" placeholder="AIza...">
+          <button class="pw-eye" onclick="togglePw('apiKeyInput',this)">👁</button>
+        </div>
+        <p style="font-size:11px;color:var(--muted);margin-top:4px;">aistudio.google.com で取得（無料・1日50回まで）</p>
+        <hr class="divider">
+        <div class="field-label">パスワードを設定（先生たちがログインに使うもの）</div>
+        <div class="pw-wrap">
+          <input type="password" id="newPw1" placeholder="パスワード（6文字以上）">
+          <button class="pw-eye" onclick="togglePw('newPw1',this)">👁</button>
+        </div>
+        <div class="field-label">パスワード（確認）</div>
+        <div class="pw-wrap">
+          <input type="password" id="newPw2" placeholder="もう一度入力">
+          <button class="pw-eye" onclick="togglePw('newPw2',this)">👁</button>
+        </div>
+        <div class="err-msg" id="saveErr"></div>
+        <button class="btn" onclick="saveSettings()">💾 保存する</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="scard">
+    <div class="scard-head" style="background:#1e40af;">🔍 デバッグ（APIテスト）</div>
+    <div class="scard-body">
+      <p style="font-size:13px;color:var(--muted);margin-bottom:12px;">保存されているAPIキーで「Hello」とGeminiに送って、生のレスポンスを確認します。</p>
+      <button class="btn sm" style="background:#1e40af;color:white;" onclick="runDebug()">🔍 APIをテストする</button>
+      <div id="debugResult" style="display:none;margin-top:12px;background:#0f172a;color:#a5f3fc;padding:14px;border-radius:8px;font-family:monospace;font-size:11px;white-space:pre-wrap;word-break:break-all;max-height:400px;overflow-y:auto;"></div>
+    </div>
+  </div>
+
+  <div class="scard">
+    <div class="scard-head danger">🗑 設定をリセット</div>
+    <div class="scard-body">
+      <p style="font-size:13px;color:var(--muted);margin-bottom:12px;">APIキーとパスワードをすべて削除します。</p>
+      <button class="btn danger sm" onclick="resetSettings()">リセットする</button>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<!-- BOTTOM NAV -->
+<nav class="bnav">
+  <button class="bnav-btn active" id="nav-home" onclick="switchTab('home')"><span class="icon">🏠</span>ホーム</button>
+  <button class="bnav-btn" id="nav-chair" onclick="switchTab('chair')"><span class="icon">🎯</span>議長</button>
+  <button class="bnav-btn" id="nav-sec" onclick="switchTab('sec')"><span class="icon">📝</span>議事録係</button>
+  <button class="bnav-btn" id="nav-settings" onclick="switchTab('settings')"><span class="icon">⚙️</span>設定</button>
+</nav>
+
+<script>
+let isLoggedIn = false;
+let currentApiKey = "";
+let resumeFileData = null;
+
+const TAB_LABELS = {
+  home: "会議をAIで楽にしましょう",
+  chair: "🎯 議長モード",
+  sec: "📝 議事録係モード",
+  settings: "⚙️ 設定"
+};
+
+window.onload = function() {
+  const DEMO_PW = "demo1234";
+  const DEMO_KEY = "DEMO_KEY_NOT_REAL";
+  if (!localStorage.getItem("smt_pw")) {
+    localStorage.setItem("smt_key", obf(DEMO_KEY));
+    localStorage.setItem("smt_pw", hashPw(DEMO_PW));
+  }
+  isLoggedIn = true;
+  currentApiKey = deobf(localStorage.getItem("smt_key") || "");
+  refreshHome();
+  refreshSettings();
+};
+
+function switchTab(tab) {
+  if ((tab === "chair" || tab === "sec") && !isLoggedIn) {
+    alert("ホームでパスワードを入力してからご利用ください。");
+    switchTab("home"); return;
+  }
+  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+  document.getElementById("screen" + tab.charAt(0).toUpperCase() + tab.slice(1)).classList.add("active");
+  document.querySelectorAll(".bnav-btn").forEach(b => b.classList.remove("active"));
+  document.getElementById("nav-" + tab).classList.add("active");
+  document.getElementById("topbarSub").textContent = TAB_LABELS[tab] || "";
+  window.scrollTo(0, 0);
+}
+
+function togglePw(id, btn) {
+  const i = document.getElementById(id);
+  i.type = i.type === "password" ? "text" : "password";
+  btn.textContent = i.type === "password" ? "👁" : "🙈";
+}
+function obf(s) {
+  const k = "sm2026tool";
+  return btoa(s.split("").map((c, i) => String.fromCharCode(c.charCodeAt(0) ^ k.charCodeAt(i % k.length))).join(""));
+}
+function deobf(s) {
+  try {
+    const k = "sm2026tool";
+    return atob(s).split("").map((c, i) => String.fromCharCode(c.charCodeAt(0) ^ k.charCodeAt(i % k.length))).join("");
+  } catch (e) { return ""; }
+}
+function hashPw(p) {
+  let h = 5381;
+  for (let i = 0; i < p.length; i++) h = ((h << 5) + h) + p.charCodeAt(i);
+  return (h >>> 0).toString(36);
+}
+function isConfigured() { return !!localStorage.getItem("smt_pw"); }
+function checkPw(p) { return hashPw(p) === localStorage.getItem("smt_pw"); }
+
+function refreshHome() {
+  document.getElementById("noSetupMsg").style.display = "none";
+  document.getElementById("lockBox").style.display = "none";
+  document.getElementById("modeSelect").style.display = "none";
+  if (!isConfigured()) document.getElementById("noSetupMsg").style.display = "block";
+  else if (isLoggedIn) document.getElementById("modeSelect").style.display = "block";
+  else document.getElementById("lockBox").style.display = "block";
+}
+function doLogin() {
+  const pw = document.getElementById("loginPw").value;
+  if (!pw) return;
+  if (checkPw(pw)) {
+    isLoggedIn = true;
+    currentApiKey = deobf(localStorage.getItem("smt_key") || "");
+    document.getElementById("loginPw").value = "";
+    document.getElementById("loginErr").style.display = "none";
+    refreshHome();
+  } else {
+    document.getElementById("loginErr").style.display = "block";
+  }
+}
+function doLogout() { isLoggedIn = false; currentApiKey = ""; refreshHome(); }
+
+function refreshSettings() {
+  const ok = isConfigured();
+  document.getElementById("apiStatus").innerHTML = ok
+    ? '<div class="status-ok">✅ APIキーとパスワードが登録済みです</div>'
+    : '<div class="status-ng">⚠️ まだ登録されていません</div>';
+  document.getElementById("adminAuthArea").style.display = ok ? "block" : "none";
+  document.getElementById("settingsForm").style.display = ok ? "none" : "block";
+}
+function unlockSettings() {
+  const pw = document.getElementById("adminAuthPw").value;
+  if (checkPw(pw)) {
+    document.getElementById("adminAuthArea").style.display = "none";
+    document.getElementById("settingsForm").style.display = "block";
+    document.getElementById("apiKeyInput").value = deobf(localStorage.getItem("smt_key") || "");
+    document.getElementById("adminAuthPw").value = "";
+    document.getElementById("adminAuthErr").style.display = "none";
+  } else {
+    document.getElementById("adminAuthErr").style.display = "block";
+  }
+}
+function saveSettings() {
+  const key = document.getElementById("apiKeyInput").value.trim();
+  const pw1 = document.getElementById("newPw1").value;
+  const pw2 = document.getElementById("newPw2").value;
+  const err = document.getElementById("saveErr");
+  err.style.display = "none";
+  if (key.length < 20) { err.textContent = "APIキーが短すぎます（20文字以上）"; err.style.display = "block"; return; }
+  if (pw1.length < 6) { err.textContent = "パスワードは6文字以上にしてください"; err.style.display = "block"; return; }
+  if (pw1 !== pw2) { err.textContent = "パスワードが一致しません"; err.style.display = "block"; return; }
+  localStorage.setItem("smt_key", obf(key));
+  localStorage.setItem("smt_pw", hashPw(pw1));
+  document.getElementById("apiKeyInput").value = "";
+  document.getElementById("newPw1").value = "";
+  document.getElementById("newPw2").value = "";
+  if (isLoggedIn) currentApiKey = key;
+  refreshSettings();
+  alert("✅ 保存しました！");
+}
+function resetSettings() {
+  if (!confirm("本当にリセットしますか？")) return;
+  localStorage.removeItem("smt_key");
+  localStorage.removeItem("smt_pw");
+  isLoggedIn = false; currentApiKey = "";
+  refreshSettings(); refreshHome();
+  alert("リセットしました。");
+}
+
+function toggleGuide() {
+  const b = document.getElementById("guideBox");
+  const o = b.classList.toggle("open");
+  document.getElementById("guideArrow").textContent = o ? "▲" : "▼";
+}
+
+function addRow() {
+  const rows = document.getElementById("agendaRows");
+  const n = rows.children.length + 1;
+  const d = document.createElement("div");
+  d.className = "agenda-row";
+  d.innerHTML = '<div class="anum">' + n + '</div><input type="text" placeholder="議題を入力"><button class="del-btn" onclick="delRow(this)">×</button>';
+  rows.appendChild(d);
+}
+function delRow(btn) {
+  if (document.getElementById("agendaRows").children.length <= 1) return;
+  btn.closest(".agenda-row").remove();
+  [...document.querySelectorAll("#agendaRows .anum")].forEach((b, i) => b.textContent = i + 1);
+}
+
+function updateCharCount() {
+  const n = document.getElementById("s_transcript").value.length;
+  document.getElementById("charCount").textContent = n + "文字";
+  document.getElementById("secBtn").disabled = n < 50;
+}
+
+function handleFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  resumeFileData = null;
+  const ext = file.name.split(".").pop().toLowerCase();
+  const statusEl = document.getElementById("fileStatus");
+  const readingEl = document.getElementById("readingStatus");
+  const previewEl = document.getElementById("resumeText");
+  readingEl.style.display = "block";
+  statusEl.style.display = "none";
+  previewEl.style.display = "none";
+
+  const reader = new FileReader();
+
+  if (ext === "pdf") {
+    reader.onload = function(e) {
+      const base64 = e.target.result.split(",")[1];
+      resumeFileData = { base64: base64, mimeType: "application/pdf", name: file.name, isBinary: true };
+      readingEl.style.display = "none";
+      statusEl.style.display = "flex";
+      document.getElementById("fileStatusText").textContent = file.name + " （PDFを読み込みました）";
+      previewEl.style.display = "block";
+      previewEl.value = "✅ PDFは「議題を改善してスケジュールを作る」ボタンを押すとAIが直接読み取ります。";
+    };
+    reader.onerror = function() { readingEl.style.display = "none"; alert("読み込みに失敗しました"); };
+    reader.readAsDataURL(file);
+  } else if (ext === "docx" || ext === "doc") {
+    reader.onload = function(e) {
+      loadMammoth().then(function() {
+        mammoth.extractRawText({ arrayBuffer: e.target.result }).then(function(result) {
+          const text = result.value.trim();
+          resumeFileData = { text: text, name: file.name, isBinary: false };
+          readingEl.style.display = "none";
+          statusEl.style.display = "flex";
+          document.getElementById("fileStatusText").textContent = file.name + "（" + text.length + "文字 読み取り済み）";
+          previewEl.style.display = "block";
+          previewEl.value = text.slice(0, 300) + (text.length > 300 ? "\n...(省略)" : "");
+        });
+      }).catch(function(err) { readingEl.style.display = "none"; alert("Word読み込みエラー: " + err.message); });
+    };
+    reader.readAsArrayBuffer(file);
+  } else {
+    reader.onload = function(e) {
+      const text = e.target.result;
+      resumeFileData = { text: text, name: file.name, isBinary: false };
+      readingEl.style.display = "none";
+      statusEl.style.display = "flex";
+      document.getElementById("fileStatusText").textContent = file.name + "（" + text.length + "文字 読み取り済み）";
+      previewEl.style.display = "block";
+      previewEl.value = text.slice(0, 300) + (text.length > 300 ? "\n...(省略)" : "");
+    };
+    reader.readAsText(file, "UTF-8");
+  }
+}
+
+function loadMammoth() {
+  if (window.mammoth) return Promise.resolve();
+  return new Promise(function(res, rej) {
+    const s = document.createElement("script");
+    s.src = "https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js";
+    s.onload = res;
+    s.onerror = function() { rej(new Error("mammoth.jsの読み込みに失敗しました")); };
+    document.head.appendChild(s);
+  });
+}
+
+function clearFile() {
+  resumeFileData = null;
+  document.getElementById("resumeFile").value = "";
+  document.getElementById("fileStatus").style.display = "none";
+  document.getElementById("resumeText").style.display = "none";
+}
+
+async function callGemini(textPrompt, fileData) {
+  if (!currentApiKey) throw new Error("APIキーが設定されていません");
+
+  // デモモード：偽のキーなら模擬応答を返す
+  if (currentApiKey === "DEMO_KEY_NOT_REAL") {
+    await new Promise(function(r) { setTimeout(r, 1500); });
+    if (textPrompt.indexOf("議事録") !== -1) {
+      return "【議事録】\n\n■ 議題1：運動会の役割分担\n・体育主任から昨年の役割表をもとに説明\n・新任の田中先生に競技係を割り当てる方針で合意\n・決定事項：6/30までに各学年の役割案を提出\n\n■ 議題2：保護者懇談\n・7月第2週で各学年実施\n・決定事項：日程調整票を6/25配布\n\n【1分サマリー】\n・運動会の役割：6/30までに学年案を提出\n・保護者懇談：7月第2週実施、6/25に日程調整票配布\n・次回会議：6/27（金）15:00\n\n【アクションプラン】\nACTION: 各学年の運動会役割案を作成 / WHO: 各学年主任 / WHEN: 6/30 / PRIORITY: 高\nACTION: 保護者懇談の日程調整票を作成・配布 / WHO: 教務主任 / WHEN: 6/25 / PRIORITY: 高\nACTION: 体育館使用スケジュール調整 / WHO: 体育主任 / WHEN: 7/5 / PRIORITY: 中";
+    }
+    let demoResult = "## ① 議題の改善提案\n\n1. 運動会の役割分担について決定する\n   ・目的：意思決定\n   ・事前準備：昨年度の役割表、今年の教職員名簿\n\n2. 来月の保護者懇談の進め方を共有する\n   ・目的：情報共有\n   ・事前準備：各学年の希望日程\n\n3. 生徒指導の現状と今後の方針を協議する\n   ・目的：意見収集\n   ・事前準備：直近1か月の指導案件まとめ\n\n## ② タイムスケジュール（60分）\n\n| 時刻 | 内容 | 時間 | 担当 |\n|------|------|------|------|\n| 15:00 | 開会・本日の議題確認 | 5分 | 議長 |\n| 15:05 | 運動会の役割分担 | 20分 | 体育主任 |\n| 15:25 | 保護者懇談の進め方 | 15分 | 教務主任 |\n| 15:40 | 生徒指導の協議 | 15分 | 生徒指導主任 |\n| 15:55 | 連絡事項・閉会 | 5分 | 議長 |\n\n## ③ 議長へのポイント\n\n1. 各議題の開始時に「この議題で何を決めるか」を明確に共有する\n2. 議論が脱線したら穏やかに軌道修正を行う\n3. 残り時間を意識し、5分前に「あと5分です」と声かけ";
+
+    if (fileData) {
+      demoResult += "\n\n## ④ 司会進行台本\n\n【開会】\n「本日はお忙しい中お集まりいただきありがとうございます。ただ今から第3回学年主任会議を始めます。本日は3つの議題について協議します。」\n\n【議題1の導入】\n「では最初の議題、運動会の役割分担に移ります。体育主任からご説明をお願いします。」\n\n【まとめ】\n「ありがとうございました。本日決まったことを確認します。運動会の役割案は6/30までに各学年からご提出ください。」\n\n【閉会】\n「以上で本日の会議を終わります。次回は6/27（金）15時からです。本日はありがとうございました。」";
+    }
+    return "🎬 [デモモード：実際のGemini APIは呼ばれていません]\n\n" + demoResult;
+  }
+
+  // 本番モード
+  let parts = [];
+  if (fileData) {
+    if (fileData.isBinary) {
+      parts.push({ inline_data: { mime_type: fileData.mimeType, data: fileData.base64 } });
+    } else {
+      parts.push({ text: "【会議資料の内容】\n" + fileData.text.slice(0, 4000) });
+    }
+  }
+  parts.push({ text: textPrompt });
+  const body = { contents: [{ parts: parts }] };
+  const res = await fetch(
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + currentApiKey,
+    { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }
+  );
+  const d = await res.json();
+  console.log("[callGemini] レスポンス:", d);
+  if (d.error) throw new Error(d.error.message + " (code: " + (d.error.code || "?") + ")");
+  if (!d.candidates || !d.candidates[0]) throw new Error("APIから応答がありません: " + JSON.stringify(d).slice(0, 200));
+  return d.candidates[0].content.parts[0].text;
+}
+
+async function runChair() {
+  const items = [...document.querySelectorAll("#agendaRows input")].map(function(i) { return i.value; }).filter(function(v) { return v.trim(); });
+  if (!items.length) { alert("議題を1つ以上入力してください"); return; }
+  document.getElementById("chairLoad").classList.add("show");
+  document.getElementById("chairResult").classList.remove("show");
+
+  const name = document.getElementById("c_name").value || "会議";
+  const duration = document.getElementById("c_duration").value || "60";
+  const date = document.getElementById("c_date").value || "";
+  const members = document.getElementById("c_members").value || "";
+  const goal = document.getElementById("c_goal").value || "";
+
+  let prompt = "学校運営の会議進行の専門家として、日本語で丁寧に回答してください。\n\n";
+  prompt += "【会議情報】\n";
+  prompt += "会議名：" + name + "\n日時：" + date + "\n持ち時間：" + duration + "分\n参加者：" + members + "\n目的：" + goal + "\n\n";
+  prompt += "【議長の議題メモ】\n";
+  prompt += items.map(function(t, i) { return (i + 1) + ". " + t; }).join("\n") + "\n\n";
+  prompt += "以下をすべて作成してください：\n\n";
+  prompt += "## ① 議題の改善提案\n各議題について、改善後の議題名・目的・事前準備を記載\n\n";
+  prompt += "## ② タイムスケジュール（" + duration + "分）\n表形式で：時刻 / 内容 / 時間 / 担当\n\n";
+  prompt += "## ③ 議長へのポイント（3点以内）\nスムーズに進めるためのアドバイス\n\n";
+
+  if (resumeFileData) {
+    prompt += "## ④ 司会進行台本\n";
+    prompt += "添付の会議資料を読み取り、議長が当日そのまま読み上げられる台本を作成してください。\n";
+    prompt += "形式：開会あいさつ → 各議題の導入セリフ → まとめセリフ → 閉会あいさつ\n";
+    prompt += "自然な口語体（「では～」「続いて～」など）で書いてください。";
+  }
+
+  try {
+    console.log("[runChair] API呼び出し開始", { keyPrefix: currentApiKey.slice(0, 10), hasFile: !!resumeFileData });
+    const result = await callGemini(prompt, resumeFileData);
+    console.log("[runChair] 成功");
+    document.getElementById("chairBody").textContent = result;
+    document.getElementById("chairResult").classList.add("show");
+  } catch (e) {
+    console.error("[runChair] エラー:", e);
+    document.getElementById("chairBody").textContent =
+      "❌ エラー: " + e.message +
+      "\n\n【確認ポイント】" +
+      "\n・APIキーが正しく保存されているか（設定タブで確認）" +
+      "\n・Gemini APIが有効化されているか（Google Cloud Console）" +
+      "\n・キーが「AQ.」形式の場合、Gemini APIで未対応の可能性があります";
+    document.getElementById("chairResult").classList.add("show");
+  } finally {
+    document.getElementById("chairLoad").classList.remove("show");
+  }
+}
+
+async function runSec() {
+  const transcript = document.getElementById("s_transcript").value.trim();
+  if (!transcript) return;
+  document.getElementById("secLoad").classList.add("show");
+  ["r_minutes", "r_summary", "r_action"].forEach(function(id) { document.getElementById(id).classList.remove("show"); });
+  const name = document.getElementById("s_name").value || "会議";
+  const date = document.getElementById("s_date").value || "";
+  const members = document.getElementById("s_members").value || "";
+  const prompt = "学校会議の議事録作成の専門家として、正確で行動につながる議事録を日本語で作成してください。\n\n"
+    + "【会議情報】会議名：" + name + "　日時：" + date + "　参加者：" + members + "\n"
+    + "【文字起こし】\n" + transcript + "\n\n"
+    + "以下の3つをすべて作成してください。\n\n"
+    + "## 【議事録】\n議題ごとに：報告の要点・主な意見・決定事項（必ず明記）。話し言葉を書き言葉に。\n\n"
+    + "## 【1分サマリー】\n今日決まったこと（3点以内）・全員が知るべきこと・次のステップ\n\n"
+    + "## 【アクションプラン】\nACTION: やること / WHO: 担当 / WHEN: 期限 / PRIORITY: 高中低　の形式で列挙";
+  try {
+    const result = await callGemini(prompt, null);
+    const min = extr(result, "【議事録】", "【1分サマリー】");
+    const sum = extr(result, "【1分サマリー】", "【アクションプラン】");
+    const act = extr(result, "【アクションプラン】", null);
+    if (min) { document.getElementById("b_minutes").textContent = min; document.getElementById("r_minutes").classList.add("show"); }
+    if (sum) { document.getElementById("b_summary").textContent = sum; document.getElementById("r_summary").classList.add("show"); }
+    if (act) { document.getElementById("b_action").textContent = act; document.getElementById("r_action").classList.add("show"); }
+    if (!min && !sum && !act) { document.getElementById("b_minutes").textContent = result; document.getElementById("r_minutes").classList.add("show"); }
+  } catch (e) {
+    document.getElementById("b_minutes").textContent = "エラー: " + e.message;
+    document.getElementById("r_minutes").classList.add("show");
+  } finally {
+    document.getElementById("secLoad").classList.remove("show");
+  }
+}
+
+async function runDebug() {
+  const out = document.getElementById("debugResult");
+  out.style.display = "block";
+  out.textContent = "🔄 テスト中...";
+
+  const savedKey = deobf(localStorage.getItem("smt_key") || "");
+  let log = "";
+  log += "=== APIキー情報 ===\n";
+  log += "長さ: " + savedKey.length + "文字\n";
+  log += "先頭10文字: " + savedKey.slice(0, 10) + "\n";
+  log += "末尾4文字: ..." + savedKey.slice(-4) + "\n\n";
+
+  if (!savedKey) {
+    log += "❌ APIキーが保存されていません。先に設定してください。";
+    out.textContent = log;
+    return;
+  }
+
+  log += "=== Gemini APIに「Hello」送信中... ===\n";
+  out.textContent = log;
+
+  try {
+    const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + savedKey;
+    const body = { contents: [{ parts: [{ text: "Hello, reply with just 'OK'" }] }] };
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+    log += "HTTPステータス: " + res.status + " " + res.statusText + "\n\n";
+    const text = await res.text();
+    log += "=== 生レスポンス ===\n";
+    log += text.slice(0, 2000);
+    out.textContent = log;
+
+    try {
+      const d = JSON.parse(text);
+      if (d.error) {
+        log += "\n\n=== 診断 ===\n";
+        log += "❌ エラーコード: " + d.error.code + "\n";
+        log += "❌ メッセージ: " + d.error.message + "\n";
+        if (d.error.code === 400) log += "→ APIキーの形式が無効です。";
+        if (d.error.code === 403) log += "→ APIキーは正しいがGemini APIが有効化されていない可能性。";
+        if (d.error.code === 429) log += "→ レート制限。少し待ってから再試行。";
+        out.textContent = log;
+      } else if (d.candidates) {
+        log += "\n\n✅ 成功！APIは正常に動作しています。";
+        out.textContent = log;
+      }
+    } catch (e) {}
+  } catch (e) {
+    log += "❌ ネットワークエラー: " + e.message;
+    out.textContent = log;
+  }
+}
+
+function extr(t, s, e) {
+  const i = t.indexOf(s); if (i === -1) return null;
+  const f = i + s.length;
+  if (!e) return t.slice(f).trim();
+  const j = t.indexOf(e, f);
+  return j === -1 ? t.slice(f).trim() : t.slice(f, j).trim();
+}
+function copyText(id) {
+  navigator.clipboard.writeText(document.getElementById(id).textContent).then(function() {
+    const b = event.target, o = b.textContent;
+    b.textContent = "✓ コピー済";
+    setTimeout(function() { b.textContent = o; }, 2000);
+  });
+}
+</script>
+</body>
+</html>
