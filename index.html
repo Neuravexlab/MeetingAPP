@@ -98,6 +98,10 @@ textarea{min-height:120px;line-height:1.7;}
 .upload-icon-wrap{font-size:36px;margin-bottom:8px;}
 .upload-zone-title{font-size:14px;font-weight:700;color:var(--navy);margin-bottom:4px;}
 .upload-zone-sub{font-size:12px;color:var(--muted);}
+.hist-item{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:8px;cursor:pointer;transition:all 0.15s;}
+.hist-item:hover{border-color:var(--blue);background:#eff6ff;}
+.hist-title{font-size:14px;font-weight:700;color:var(--ink);margin-bottom:3px;}
+.hist-meta{font-size:11px;color:var(--muted);}
 @media(max-width:480px){.hero-title{font-size:18px;}.btn{font-size:14px;padding:13px;}}
 </style>
 </head>
@@ -122,17 +126,7 @@ textarea{min-height:120px;line-height:1.7;}
     <div style="font-size:13px;color:var(--muted);margin-bottom:16px;">管理者が「設定」タブでAPIキーとパスワードを登録してください。</div>
     <button class="btn sm" onclick="switchTab('settings')">⚙️ 設定へ</button>
   </div>
-  <div id="lockBox" class="lock-box" style="display:none;">
-    <div class="lock-icon">🔒</div>
-    <div class="lock-title">パスワードを入力</div>
-    <div class="lock-desc">管理者から受け取ったパスワードを入力してください。</div>
-    <div class="pw-wrap">
-      <input type="password" id="loginPw" placeholder="パスワード" onkeydown="if(event.key==='Enter')doLogin()">
-      <button class="pw-eye" onclick="togglePw('loginPw',this)">👁</button>
-    </div>
-    <div class="err-msg" id="loginErr">パスワードが違います</div>
-    <button class="btn" onclick="doLogin()">🔓 ログイン</button>
-  </div>
+<div id="lockBox" style="display:none;"></div>
   <div id="modeSelect" style="display:none;">
     <div style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:0.1em;margin-bottom:12px;">📋 モードを選ぶ</div>
     <div class="mode-cards">
@@ -155,9 +149,7 @@ textarea{min-height:120px;line-height:1.7;}
         <div class="mode-arrow">›</div>
       </div>
     </div>
-    <div style="text-align:right;margin-top:10px;">
-      <button onclick="doLogout()" style="background:none;border:none;font-size:12px;color:var(--muted);cursor:pointer;font-family:inherit;">🔒 ログアウト</button>
-    </div>
+
   </div>
   <button class="guide-toggle" onclick="toggleGuide()">
     <span>📖</span> 使い方ガイドを見る <span style="margin-left:auto" id="guideArrow">▼</span>
@@ -320,12 +312,42 @@ textarea{min-height:120px;line-height:1.7;}
 </div>
 </div>
 
+<!-- HISTORY -->
+<div class="screen" id="screenHistory">
+<div class="wrap">
+  <div class="card">
+    <div class="card-title">📚 履歴（最新5件まで）
+      <button onclick="clearHistory()" style="margin-left:auto;background:none;border:none;color:var(--red);font-size:11px;cursor:pointer;font-family:inherit;">🗑 全削除</button>
+    </div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:12px;">過去に生成した議事録・スケジュールが保存されています。タップで詳細表示。</p>
+    <div id="historyList"></div>
+  </div>
+  <div id="historyDetail" style="display:none;"></div>
+</div>
+</div>
+
+<!-- HISTORY SCREEN -->
+<div class="screen" id="screenHistory">
+<div class="wrap">
+
+  <div class="card">
+    <div class="card-title">📚 履歴（最新5件）</div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:14px;">議長モード・議事録モードで生成した結果がここに保存されます。</p>
+    <div id="historyList">
+      <p style="text-align:center;color:var(--muted);font-size:13px;padding:20px;">まだ履歴はありません</p>
+    </div>
+    <button class="btn outline" onclick="clearHistory()" style="margin-top:14px;">🗑 履歴をすべて削除</button>
+  </div>
+
+</div>
+</div>
+
 <!-- BOTTOM NAV -->
 <nav class="bnav">
   <button class="bnav-btn active" id="nav-home" onclick="switchTab('home')"><span class="icon">🏠</span>ホーム</button>
   <button class="bnav-btn" id="nav-chair" onclick="switchTab('chair')"><span class="icon">🎯</span>議長</button>
   <button class="bnav-btn" id="nav-sec" onclick="switchTab('sec')"><span class="icon">📝</span>議事録係</button>
-  <button class="bnav-btn" id="nav-settings" onclick="switchTab('settings')"><span class="icon">⚙️</span>設定</button>
+  <button class="bnav-btn" id="nav-history" onclick="switchTab('history')"><span class="icon">📚</span>履歴</button><button class="bnav-btn" id="nav-settings" onclick="switchTab('settings')"><span class="icon">⚙️</span>設定</button>
 </nav>
 
 <script>
@@ -337,16 +359,24 @@ const TAB_LABELS = {
   home: "会議をAIで楽にしましょう",
   chair: "🎯 議長モード",
   sec: "📝 議事録係モード",
+  history: "📚 履歴",
+  history: "📚 履歴",
   settings: "⚙️ 設定"
 };
 
 window.onload = function() {
+  // APIキーが登録されていれば自動的に使える状態にする
+  if (isConfigured()) {
+    isLoggedIn = true;
+    currentApiKey = deobf(localStorage.getItem("smt_key") || "");
+  }
   refreshHome();
   refreshSettings();
+  renderHistory();
 };
 
 function switchTab(tab) {
-  if ((tab === "chair" || tab === "sec") && !isLoggedIn) {
+  if ((tab === "chair" || tab === "sec" || tab === "history") && !isLoggedIn) {
     alert("ホームでパスワードを入力してからご利用ください。");
     switchTab("home"); return;
   }
@@ -355,6 +385,7 @@ function switchTab(tab) {
   document.querySelectorAll(".bnav-btn").forEach(b => b.classList.remove("active"));
   document.getElementById("nav-" + tab).classList.add("active");
   document.getElementById("topbarSub").textContent = TAB_LABELS[tab] || "";
+  if (tab === "history") renderHistory();
   window.scrollTo(0, 0);
 }
 
@@ -385,9 +416,11 @@ function refreshHome() {
   document.getElementById("noSetupMsg").style.display = "none";
   document.getElementById("lockBox").style.display = "none";
   document.getElementById("modeSelect").style.display = "none";
-  if (!isConfigured()) document.getElementById("noSetupMsg").style.display = "block";
-  else if (isLoggedIn) document.getElementById("modeSelect").style.display = "block";
-  else document.getElementById("lockBox").style.display = "block";
+  if (!isConfigured()) {
+    document.getElementById("noSetupMsg").style.display = "block";
+  } else {
+    document.getElementById("modeSelect").style.display = "block";
+  }
 }
 function doLogin() {
   const pw = document.getElementById("loginPw").value;
@@ -656,6 +689,8 @@ async function runChair() {
     console.log("[runChair] 成功");
     document.getElementById("chairBody").textContent = result;
     document.getElementById("chairResult").classList.add("show");
+    saveHistory({ type: "chair", title: name + " " + (date || ""), content: result, time: new Date().toISOString() });
+    saveHistory("chair", { name: name, date: date, result: result });
   } catch (e) {
     console.error("[runChair] エラー:", e);
     document.getElementById("chairBody").textContent =
@@ -715,6 +750,7 @@ async function runSec() {
     if (sum) { document.getElementById("b_summary").textContent = sum; document.getElementById("r_summary").classList.add("show"); }
     if (act) { document.getElementById("b_action").textContent = act; document.getElementById("r_action").classList.add("show"); }
     if (!min && !sum && !act) { document.getElementById("b_minutes").textContent = result; document.getElementById("r_minutes").classList.add("show"); }
+    saveHistory("sec", { name: name, date: date, minutes: min || result, summary: sum || "", action: act || "" });
   } catch (e) {
     document.getElementById("b_minutes").textContent = "エラー: " + e.message;
     document.getElementById("r_minutes").classList.add("show");
@@ -777,6 +813,164 @@ async function runDebug() {
     log += "❌ ネットワークエラー: " + e.message;
     out.textContent = log;
   }
+}
+
+function saveHistory(mode, data) {
+  try {
+    const KEY = "smt_history_" + mode;
+    const list = JSON.parse(localStorage.getItem(KEY) || "[]");
+    list.unshift({ ts: new Date().toISOString(), data: data });
+    if (list.length > 5) list.length = 5;
+    localStorage.setItem(KEY, JSON.stringify(list));
+  } catch (e) { console.error("履歴保存失敗:", e); }
+}
+
+function loadHistory(mode) {
+  try {
+    return JSON.parse(localStorage.getItem("smt_history_" + mode) || "[]");
+  } catch (e) { return []; }
+}
+
+function renderHistory() {
+  const chair = loadHistory("chair");
+  const sec = loadHistory("sec");
+  const wrap = document.getElementById("historyList");
+  if (!wrap) return;
+
+  if (chair.length === 0 && sec.length === 0) {
+    wrap.innerHTML = '<p style="font-size:13px;color:var(--muted);text-align:center;padding:24px;">まだ履歴がありません。<br>議長モード・議事録係モードで生成すると、ここに保存されます。</p>';
+    return;
+  }
+
+  let html = "";
+  if (chair.length > 0) {
+    html += '<div style="font-size:12px;font-weight:700;color:var(--blue);margin:8px 0 8px;">🎯 議長モード（' + chair.length + '件）</div>';
+    chair.forEach(function(item, i) {
+      const t = new Date(item.ts);
+      const dateStr = t.getMonth()+1 + "/" + t.getDate() + " " + ("0"+t.getHours()).slice(-2) + ":" + ("0"+t.getMinutes()).slice(-2);
+      html += '<div class="hist-item" onclick="showHistory(\'chair\',' + i + ')">';
+      html += '<div class="hist-title">' + (item.data.name || "会議") + '</div>';
+      html += '<div class="hist-meta">' + dateStr + (item.data.date ? " ・ " + item.data.date : "") + '</div></div>';
+    });
+  }
+  if (sec.length > 0) {
+    html += '<div style="font-size:12px;font-weight:700;color:var(--teal);margin:18px 0 8px;">📝 議事録係モード（' + sec.length + '件）</div>';
+    sec.forEach(function(item, i) {
+      const t = new Date(item.ts);
+      const dateStr = t.getMonth()+1 + "/" + t.getDate() + " " + ("0"+t.getHours()).slice(-2) + ":" + ("0"+t.getMinutes()).slice(-2);
+      html += '<div class="hist-item" onclick="showHistory(\'sec\',' + i + ')">';
+      html += '<div class="hist-title">' + (item.data.name || "会議") + '</div>';
+      html += '<div class="hist-meta">' + dateStr + (item.data.date ? " ・ " + item.data.date : "") + '</div></div>';
+    });
+  }
+  wrap.innerHTML = html;
+}
+
+function showHistory(mode, idx) {
+  const item = loadHistory(mode)[idx];
+  if (!item) return;
+  const detail = document.getElementById("historyDetail");
+  let html = '<button onclick="document.getElementById(\'historyDetail\').style.display=\'none\'" style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:6px 14px;font-family:inherit;font-size:12px;cursor:pointer;margin-bottom:12px;">← 一覧に戻る</button>';
+  if (mode === "chair") {
+    html += '<div class="result-card show" style="margin-top:0;"><div class="result-head">✨ AI改善提案<button class="copy-btn" onclick="navigator.clipboard.writeText(this.parentElement.nextElementSibling.textContent)">コピー</button></div><div class="result-body">' + escapeHtml(item.data.result) + '</div></div>';
+  } else {
+    if (item.data.minutes) html += '<div class="result-card show" style="margin-top:0;"><div class="result-head teal">📋 議事録<button class="copy-btn" onclick="navigator.clipboard.writeText(this.parentElement.nextElementSibling.textContent)">コピー</button></div><div class="result-body">' + escapeHtml(item.data.minutes) + '</div></div>';
+    if (item.data.summary) html += '<div class="result-card show"><div class="result-head green">⚡ サマリー<button class="copy-btn" onclick="navigator.clipboard.writeText(this.parentElement.nextElementSibling.textContent)">コピー</button></div><div class="result-body">' + escapeHtml(item.data.summary) + '</div></div>';
+    if (item.data.action) html += '<div class="result-card show"><div class="result-head amber">✅ アクション<button class="copy-btn" onclick="navigator.clipboard.writeText(this.parentElement.nextElementSibling.textContent)">コピー</button></div><div class="result-body">' + escapeHtml(item.data.action) + '</div></div>';
+  }
+  detail.innerHTML = html;
+  detail.style.display = "block";
+  window.scrollTo({ top: detail.offsetTop - 80, behavior: "smooth" });
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>]/g, function(c) { return {"&":"&amp;","<":"&lt;",">":"&gt;"}[c]; });
+}
+
+function clearHistory() {
+  if (!confirm("履歴をすべて削除しますか？")) return;
+  localStorage.removeItem("smt_history_chair");
+  localStorage.removeItem("smt_history_sec");
+  renderHistory();
+  document.getElementById("historyDetail").style.display = "none";
+}
+
+// ===== HISTORY =====
+function saveHistory(item) {
+  let hist = [];
+  try { hist = JSON.parse(localStorage.getItem("smt_history") || "[]"); } catch (e) {}
+  hist.unshift(item);
+  hist = hist.slice(0, 5);
+  localStorage.setItem("smt_history", JSON.stringify(hist));
+}
+
+function renderHistory() {
+  const listEl = document.getElementById("historyList");
+  if (!listEl) return;
+  let hist = [];
+  try { hist = JSON.parse(localStorage.getItem("smt_history") || "[]"); } catch (e) {}
+  if (!hist.length) {
+    listEl.innerHTML = '<p style="text-align:center;color:var(--muted);font-size:13px;padding:20px;">まだ履歴はありません</p>';
+    return;
+  }
+  listEl.innerHTML = hist.map(function(h, i) {
+    const date = new Date(h.time);
+    const dateStr = date.getFullYear() + "/" + (date.getMonth()+1) + "/" + date.getDate() + " " +
+                    String(date.getHours()).padStart(2,"0") + ":" + String(date.getMinutes()).padStart(2,"0");
+    const typeLabel = h.type === "chair" ? "🎯 議長" : "📝 議事録";
+    const typeColor = h.type === "chair" ? "var(--blue)" : "var(--teal)";
+    return '<div class="hist-item" style="border:1px solid var(--border);border-radius:8px;margin-bottom:10px;overflow:hidden;">' +
+      '<div style="background:' + typeColor + ';color:white;padding:8px 14px;font-size:12px;font-weight:700;display:flex;justify-content:space-between;align-items:center;">' +
+        '<span>' + typeLabel + ' — ' + (h.title || "無題") + '</span>' +
+        '<span style="font-weight:400;opacity:0.8;font-size:11px;">' + dateStr + '</span>' +
+      '</div>' +
+      '<div style="padding:12px 14px;background:white;">' +
+        '<div id="hist-body-' + i + '" style="font-size:12px;line-height:1.7;white-space:pre-wrap;max-height:80px;overflow:hidden;color:var(--muted);">' + escapeHTML(h.content.slice(0,200)) + '...</div>' +
+        '<div style="margin-top:10px;display:flex;gap:8px;">' +
+          '<button class="btn sm" style="background:var(--navy);color:white;" onclick="expandHistory(' + i + ')">📖 全文表示</button>' +
+          '<button class="btn sm outline" onclick="copyHistory(' + i + ')">📋 コピー</button>' +
+          '<button class="btn sm" style="background:#dc2626;color:white;" onclick="deleteHistoryItem(' + i + ')">🗑</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  }).join("");
+}
+
+function escapeHTML(s) {
+  return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+
+function expandHistory(i) {
+  let hist = JSON.parse(localStorage.getItem("smt_history") || "[]");
+  const body = document.getElementById("hist-body-" + i);
+  if (body.style.maxHeight === "none") {
+    body.style.maxHeight = "80px";
+    body.textContent = hist[i].content.slice(0,200) + "...";
+  } else {
+    body.style.maxHeight = "none";
+    body.textContent = hist[i].content;
+  }
+}
+
+function copyHistory(i) {
+  let hist = JSON.parse(localStorage.getItem("smt_history") || "[]");
+  navigator.clipboard.writeText(hist[i].content).then(function() {
+    alert("📋 クリップボードにコピーしました");
+  });
+}
+
+function deleteHistoryItem(i) {
+  if (!confirm("この履歴を削除しますか？")) return;
+  let hist = JSON.parse(localStorage.getItem("smt_history") || "[]");
+  hist.splice(i, 1);
+  localStorage.setItem("smt_history", JSON.stringify(hist));
+  renderHistory();
+}
+
+function clearHistory() {
+  if (!confirm("すべての履歴を削除しますか？")) return;
+  localStorage.removeItem("smt_history");
+  renderHistory();
 }
 
 function extr(t, s, e) {
