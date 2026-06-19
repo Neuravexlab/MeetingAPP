@@ -253,42 +253,17 @@ textarea{min-height:120px;line-height:1.7;}
 <div class="wrap">
 
   <div class="scard">
-    <div class="scard-head">🔑 APIキー＆パスワード設定（管理者用）</div>
+    <div class="scard-head">🔑 APIキー設定</div>
     <div class="scard-body">
       <div id="apiStatus"></div>
-      <hr class="divider">
-      <!-- 設定済みの場合：管理者認証 -->
-      <div id="adminAuthArea" style="display:none;">
-        <p style="font-size:13px;color:var(--muted);margin-bottom:12px;">設定を変更するには管理者パスワードを入力してください。</p>
-        <div class="pw-wrap">
-          <input type="password" id="adminAuthPw" placeholder="管理者パスワード" onkeydown="if(event.key==='Enter')unlockSettings()">
-          <button class="pw-eye" onclick="togglePw('adminAuthPw',this)">👁</button>
-        </div>
-        <div class="err-msg" id="adminAuthErr">パスワードが違います</div>
-        <button class="btn sm" style="margin-top:10px;" onclick="unlockSettings()">🔓 設定を変更する</button>
+      <div class="field-label" style="margin-top:14px;">Gemini APIキー</div>
+      <div class="pw-wrap">
+        <input type="password" id="apiKeyInput" placeholder="AIza...">
+        <button class="pw-eye" onclick="togglePw('apiKeyInput',this)">👁</button>
       </div>
-      <!-- 設定フォーム -->
-      <div id="settingsForm" style="display:none;">
-        <div class="field-label">Gemini APIキー</div>
-        <div class="pw-wrap">
-          <input type="password" id="apiKeyInput" placeholder="AIza...">
-          <button class="pw-eye" onclick="togglePw('apiKeyInput',this)">👁</button>
-        </div>
-        <p style="font-size:11px;color:var(--muted);margin-top:4px;">aistudio.google.com で取得（無料・1日50回まで）</p>
-        <hr class="divider">
-        <div class="field-label">パスワードを設定（先生たちがログインに使うもの）</div>
-        <div class="pw-wrap">
-          <input type="password" id="newPw1" placeholder="パスワード（6文字以上）">
-          <button class="pw-eye" onclick="togglePw('newPw1',this)">👁</button>
-        </div>
-        <div class="field-label">パスワード（確認）</div>
-        <div class="pw-wrap">
-          <input type="password" id="newPw2" placeholder="もう一度入力">
-          <button class="pw-eye" onclick="togglePw('newPw2',this)">👁</button>
-        </div>
-        <div class="err-msg" id="saveErr"></div>
-        <button class="btn" onclick="saveSettings()">💾 保存する</button>
-      </div>
+      <p style="font-size:11px;color:var(--muted);margin-top:4px;">aistudio.google.com で取得（無料・1日50回まで）<br>※キーはこの端末のブラウザにのみ保存されます。常に「●●●●」で隠れて表示されます。</p>
+      <div class="err-msg" id="saveErr"></div>
+      <button class="btn" style="margin-top:12px;" onclick="saveSettings()">💾 保存する</button>
     </div>
   </div>
 
@@ -440,10 +415,8 @@ function doLogout() { isLoggedIn = false; currentApiKey = ""; refreshHome(); }
 function refreshSettings() {
   const ok = isConfigured();
   document.getElementById("apiStatus").innerHTML = ok
-    ? '<div class="status-ok">✅ APIキーとパスワードが登録済みです</div>'
-    : '<div class="status-ng">⚠️ まだ登録されていません</div>';
-  document.getElementById("adminAuthArea").style.display = ok ? "block" : "none";
-  document.getElementById("settingsForm").style.display = ok ? "none" : "block";
+    ? '<div class="status-ok">✅ APIキー登録済み（変更したい場合は下に新しいキーを入力して保存）</div>'
+    : '<div class="status-ng">⚠️ APIキーがまだ登録されていません</div>';
 }
 function unlockSettings() {
   const pw = document.getElementById("adminAuthPw").value;
@@ -459,21 +432,18 @@ function unlockSettings() {
 }
 function saveSettings() {
   const key = document.getElementById("apiKeyInput").value.trim();
-  const pw1 = document.getElementById("newPw1").value;
-  const pw2 = document.getElementById("newPw2").value;
   const err = document.getElementById("saveErr");
   err.style.display = "none";
   if (key.length < 20) { err.textContent = "APIキーが短すぎます（20文字以上）"; err.style.display = "block"; return; }
-  if (pw1.length < 6) { err.textContent = "パスワードは6文字以上にしてください"; err.style.display = "block"; return; }
-  if (pw1 !== pw2) { err.textContent = "パスワードが一致しません"; err.style.display = "block"; return; }
   localStorage.setItem("smt_key", obf(key));
-  localStorage.setItem("smt_pw", hashPw(pw1));
+  // パスワード機能廃止後も isConfigured() を動作させるためのフラグ
+  localStorage.setItem("smt_pw", "set");
   document.getElementById("apiKeyInput").value = "";
-  document.getElementById("newPw1").value = "";
-  document.getElementById("newPw2").value = "";
-  if (isLoggedIn) currentApiKey = key;
+  currentApiKey = key;
+  isLoggedIn = true;
   refreshSettings();
-  alert("✅ 保存しました！");
+  refreshHome();
+  alert("✅ APIキーを保存しました！");
 }
 function resetSettings() {
   if (!confirm("本当にリセットしますか？")) return;
